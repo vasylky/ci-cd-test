@@ -9,73 +9,21 @@ jobs:
 
     steps:
 
-    # -------- PagerDuty MW --------
-    - name: Enable PagerDuty Maintenance Window
+    - name: Enable UptimeRobot MW (hardcoded)
       run: |
-        START=$(date -u -d "+5 minutes" +"%Y-%m-%dT%H:%M:%SZ")
-        END=$(date -u -d "+10 minutes" +"%Y-%m-%dT%H:%M:%SZ")  # 5 min duration
-
-        curl -X POST "https://api.pagerduty.com/maintenance_windows" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/vnd.pagerduty+json;version=2" \
-          -H "Authorization: Token token=${{ secrets.PAGERDUTY_API_KEY }}" \
-          -d "{
-            \"maintenance_window\": {
-              \"type\": \"maintenance_window\",
-              \"start_time\": \"$START\",
-              \"end_time\": \"$END\",
-              \"description\": \"Deploy Test Window\",
-              \"services\": [{
-                \"id\": \"${{ secrets.PAGERDUTY_SERVICE_ID }}\",
-                \"type\": \"service_reference\"
-              }]
-            }
-          }" -o pd.json
-
-        echo "PagerDuty response:"
-        cat pd.json
-        PD_ID=$(jq -r '.maintenance_window.id' pd.json)
-        echo "PD_MW_ID=$PD_ID" >> $GITHUB_ENV
-        echo "PagerDuty MW ID: $PD_ID"
-
-
-   # -------- UptimeRobot MW (attach monitors) --------
-    - name: Enable UptimeRobot Maintenance Window
-      env:
-        UR_MONITOR_IDS: ${{ secrets.UPTIME_ROBOT_MONITOR_IDS }}   # e.g. "801786487" or "801786487-801234567"
-        UR_KEY: ${{ secrets.UPTIME_ROBOT_API_KEY }}              # Ensure you have your Main API Key here
-      run: |
-        # Calculate start time (now + 30 seconds) and duration (5 minutes)
-        START_TIME=$(($(date +%s) + 30))
-        DURATION=300 # Duration should be in seconds for this endpoint (5 minutes = 300s)
-
-        echo "Attempting to create a one-time MW for monitors: ${UR_MONITOR_IDS}"
-        echo "Start Time (Epoch): ${START_TIME}, Duration (Seconds): ${DURATION}"
-
-        curl -sS -X POST "https://api.uptimerobot.com/v2/newMWindow" \
-           -H "Content-Type: application/x-www-form-urlencoded" \
-           --data-urlencode "api_key=${UR_KEY}" \
-           --data-urlencode "friendly_name=deploy-maintenance" \
-           --data-urlencode "type=1" \
-           --data-urlencode "start_time=${START_TIME}" \
-           --data-urlencode "duration=${DURATION}" \
-           --data-urlencode "monitors=${UR_MONITOR_IDS}" \
-           -o ur_create_response.json
-
-        echo "UR create MW response:" && cat ur_create_response.json
-
-        # Check if creation was successful and extract the ID using 'jq'
-        if [ $(jq -r '.stat' ur_create_response.json) != "ok" ]; then
-            echo "Failed to create UptimeRobot Maintenance Window."
-            exit 1
-        fi
-
-        UR_ID=$(jq -r '.mwindow.id' ur_create_response.json)
-        echo "UR_MW_ID=${UR_ID}" >> $GITHUB_ENV
-        echo "UptimeRobot MW ID: ${UR_ID} created successfully."
-
-        # The subsequent loop using editMonitor is unnecessary with the fixed 'monitors' parameter above.
-        # Monitors are now already attached to the MW upon creation.
+          START_TIME=$(( $(date +%s) + 30 ))
+          curl -sS -X POST "https://api.uptimerobot.com/v2/newMWindow" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "apiKey": "'"${{ secrets.UPTIME_ROBOT_API_KEY }}"'",
+              "friendlyName": "deploy-maintenance",
+              "type": 1,
+              "startTime": '"$START_TIME"',
+              "duration": 5,
+              "monitorIds": [801786487,801234567]
+            }' -o ur.json
+          cat ur.json
+      
 
     # -------- WAIT 5 MINUTES --------
     - name: Wait until MW auto-ends
