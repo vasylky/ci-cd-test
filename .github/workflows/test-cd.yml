@@ -9,21 +9,48 @@ jobs:
 
     steps:
 
-    - name: Create UptimeRobot MW (JSON)
+    - name: Create + attach UptimeRobot MW (reliable)
       env:
           UR_API_KEY: ${{ secrets.UPTIME_ROBOT_API_KEY }}
       run: |
-          START_TIME=$(( $(date +%s) + 300 ))  # +5 хв
+          set -euo pipefail
+      
+          START_TIME=$(( $(date +%s) + 300 ))   # +5 хв
+          DURATION=5                             # хвилини!
+      
+          # 1) створюємо MW (form-encoded, snake_case)
           curl -sS -X POST "https://api.uptimerobot.com/v2/newMWindow" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "api_key": "'"${UR_API_KEY}"'",
-              "friendly_name": "deploy-maintenance",
-              "type": 1,
-              "start_time": '"$START_TIME"',
-              "duration": 5,
-              "monitorIds": [801786487,801234567]
-            }'
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "api_key=${UR_API_KEY}" \
+            --data-urlencode "friendly_name=deploy maintenance" \
+            --data-urlencode "type=1" \
+            --data-urlencode "start_time=${START_TIME}" \
+            --data-urlencode "duration=${DURATION}" \
+            -o ur.json
+      
+          echo "Create MW response:" && cat ur.json
+          if [ "$(jq -r '.stat' ur.json)" != "ok" ]; then
+            echo "Failed to create MW"; exit 1
+          fi
+          UR_ID=$(jq -r '.mwindow.id' ur.json)
+          echo "UR_MW_ID=$UR_ID" >> $GITHUB_ENV
+          echo "MW ID: $UR_ID"
+      
+          # 2) надійно «прошиваємо» MW у кожен монітор (перезаписує список mwindows)
+          for MID in 801786487 801234567; do
+            echo "Attach MW $UR_ID to monitor $MID"
+            curl -sS -X POST "https://api.uptimerobot.com/v2/editMonitor" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "api_key=${UR_API_KEY}" \
+              --data-urlencode "id=${MID}" \
+              --data-urlencode "mwindows=${UR_ID}" \
+              -o "edit_${MID}.json"
+            cat "edit_${MID}.json"
+            if [ "$(jq -r '.stat' "edit_${MID}.json")" != "ok" ]; then
+              echo "Failed to attach MW for monitor $MID"; exit 1
+            fi
+          done
+      
       
 
     
