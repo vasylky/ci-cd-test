@@ -54,7 +54,7 @@ jobs:
           -d "type=1" \
           -d "start_time=$START_TIME" \
           -d "duration=$DURATION" \
-          -d "monitors=801786487" \
+          -d "monitors=801786487-801786480" \
           -o ur.json
 
         echo "UptimeRobot response:"
