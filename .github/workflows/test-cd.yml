@@ -44,25 +44,37 @@ jobs:
       env:
         UR_MONITOR_IDS: ${{ secrets.UPTIME_ROBOT_MONITOR_IDS }}   # e.g. "801786487" or "801786487-801234567"
       run: |
-        START_TIME=$(($(date +%s) + 300))  # Start in 5 minutes
+        START_TIME=$(($(date +%s) + 30))  # Start in 5 minutes
         DURATION=5                          # last 5 minutes
 
-        curl -X POST "https://api.uptimerobot.com/v2/newMWindow" \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          --data-urlencode "api_key=${{ secrets.UPTIME_ROBOT_API_KEY }}" \
-          --data-urlencode "friendly_name=deploy-maintenance" \
-          --data-urlencode "type=1" \
-          --data-urlencode "start_time=${START_TIME}" \
-          --data-urlencode "duration=${DURATION}" \
-          --data-urlencode "monitor_ids=${UR_MONITOR_IDS}" \
-          -o ur.json
+    # 1) Створити MW і одразу передати monitor_ids (обов'язково form-urlencoded)
+    curl -sS -X POST "https://api.uptimerobot.com/v2/newMWindow" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      --data-urlencode "api_key=${UR_KEY}" \
+      --data-urlencode "friendly_name=deploy-maintenance" \
+      --data-urlencode "type=1" \
+      --data-urlencode "start_time=${START_TIME}" \
+      --data-urlencode "duration=${DURATION}" \
+      --data-urlencode "monitor_ids=${UR_MONITOR_IDS}" \
+      -o ur.json
 
-        echo "UptimeRobot response:"
-        cat ur.json
-        UR_ID=$(jq -r '.mwindow.id' ur.json)
-        echo "UR_MW_ID=$UR_ID" >> $GITHUB_ENV
-        echo "UptimeRobot MW ID: $UR_ID"
+    echo "UR create MW response:" && cat ur.json
+    UR_ID=$(jq -r '.mwindow.id' ur.json)
+    echo "UR_MW_ID=${UR_ID}" >> $GITHUB_ENV
+    echo "UptimeRobot MW ID: ${UR_ID}"
 
+    # 2) Надійний fallback: додатково пришиємо MW до кожного монітора через editMonitor
+    IFS='-' read -ra IDS <<< "${UR_MONITOR_IDS}"
+    for MID in "${IDS[@]}"; do
+      echo "Attach MW ${UR_ID} to monitor ${MID}"
+      curl -sS -X POST "https://api.uptimerobot.com/v2/editMonitor" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        --data-urlencode "api_key=${UR_KEY}" \
+        --data-urlencode "id=${MID}" \
+        --data-urlencode "mwindows=${UR_ID}" \
+        -o "edit_${MID}.json"
+      echo "editMonitor(${MID}):" && cat "edit_${MID}.json"
+    done
 
     # -------- WAIT 5 MINUTES --------
     - name: Wait until MW auto-ends
