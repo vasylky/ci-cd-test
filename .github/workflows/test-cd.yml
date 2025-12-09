@@ -9,43 +9,21 @@ jobs:
 
     steps:
 
-    - name: Enable UptimeRobot MW (with monitorIds)
-      env:
-          UR_API_KEY: ${{ secrets.UPTIME_ROBOT_API_KEY }}
-          # Числові ID моніторів (через кому)
-          UR_MON_IDS: "801786487,801234567"
+    - name: Enable UptimeRobot MW (hardcoded)
       run: |
-          START_TIME=$(( $(date +%s) + 30 ))   # старт через 5 хв
-          DURATION=5                            # тривалість 5 хв
-      
-          JSON_BODY=$(jq -n \
-            --arg key   "$UR_API_KEY" \
-            --arg name  "deploy-maintenance" \
-            --argjson t 1 \
-            --argjson st "$START_TIME" \
-            --argjson du "$DURATION" \
-            --arg mons  "[$(echo "$UR_MON_IDS" | sed 's/,/, /g')]" \
-            '{
-               apiKey:      $key,
-               friendlyName:$name,
-               type:        $t,
-               startTime:   $st,
-               duration:    $du,
-               monitorIds:  ( $mons | fromjson )
-             }')
-      
-          echo "$JSON_BODY" | jq
-      
+          START_TIME=$(( $(date +%s) + 45 ))  # +5 хв
           curl -sS -X POST "https://api.uptimerobot.com/v2/newMWindow" \
-            -H "Content-Type: application/json" \
-            -d "$JSON_BODY" \
-            -o ur.json
-      
-          echo "UptimeRobot response:" && cat ur.json
-          UR_ID=$(jq -r '.mwindow.id // .mWindow.id // empty' ur.json)
-          echo "UR_MW_ID=$UR_ID" >> $GITHUB_ENV
-          echo "UptimeRobot MW ID: $UR_ID"
-      
+          -H "Content-Type: application/json" \
+          -d '{
+            "api_key": "'"${UPTIME_ROBOT_API_KEY}"'",
+            "friendlyName": "deploy-maintenance",
+            "type": 1,
+            "startTime": '"$START_TIME"',
+            "duration": 5,
+            "monitorIds": [801786487,801234567]
+          }'
+
+    
 
     # -------- WAIT 5 MINUTES --------
     - name: Wait until MW auto-ends
