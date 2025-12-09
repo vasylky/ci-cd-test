@@ -41,6 +41,8 @@ jobs:
 
     # -------- UptimeRobot MW --------
     - name: Enable UptimeRobot Maintenance Window
+      env:
+        UR_MONITOR_IDS: ${{ secrets.UPTIME_ROBOT_MONITOR_IDS }}
       run: |
         START_TIME=$(($(date +%s) + 300))  # Start in 5 minutes
         DURATION=5  # last 5 minutes
@@ -52,6 +54,7 @@ jobs:
           -d "type=1" \
           -d "start_time=$START_TIME" \
           -d "duration=$DURATION" \
+          -d "monitor_ids=$UR_MONITOR_IDS" \
           -o ur.json
 
         echo "UptimeRobot response:"
