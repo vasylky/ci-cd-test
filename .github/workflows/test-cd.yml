@@ -15,14 +15,18 @@ jobs:
       run: |
           set -euo pipefail
       
+          # 0) jq на раннері
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y jq >/dev/null
+      
           START_TIME=$(( $(date +%s) + 300 ))   # +5 хв
           DURATION=5                             # хвилини!
       
-          # 1) створюємо MW (form-encoded, snake_case)
+          # 1) Створюємо MW (form-encoded, snake_case)
           curl -sS -X POST "https://api.uptimerobot.com/v2/newMWindow" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             --data-urlencode "api_key=${UR_API_KEY}" \
-            --data-urlencode "friendly_name=deploy maintenance" \
+            --data-urlencode "friendly_name=deploy_maintenance" \
             --data-urlencode "type=1" \
             --data-urlencode "start_time=${START_TIME}" \
             --data-urlencode "duration=${DURATION}" \
@@ -32,28 +36,26 @@ jobs:
           if [ "$(jq -r '.stat' ur.json)" != "ok" ]; then
             echo "Failed to create MW"; exit 1
           fi
+      
           UR_ID=$(jq -r '.mwindow.id' ur.json)
           echo "UR_MW_ID=$UR_ID" >> $GITHUB_ENV
           echo "MW ID: $UR_ID"
       
-          # 2) надійно «прошиваємо» MW у кожен монітор (перезаписує список mwindows)
-          for MID in 801786487 801234567; do
-            echo "Attach MW $UR_ID to monitor $MID"
-            curl -sS -X POST "https://api.uptimerobot.com/v2/editMonitor" \
-              -H "Content-Type: application/x-www-form-urlencoded" \
-              --data-urlencode "api_key=${UR_API_KEY}" \
-              --data-urlencode "id=${MID}" \
-              --data-urlencode "mwindows=${UR_ID}" \
-              -o "edit_${MID}.json"
-            cat "edit_${MID}.json"
-            if [ "$(jq -r '.stat' "edit_${MID}.json")" != "ok" ]; then
-              echo "Failed to attach MW for monitor $MID"; exit 1
-            fi
-          done
+          # 2) Прикріплюємо монітори ОДНИМ запитом (editMWindow + monitor_ids)
+          #    формат: ID-и через дефіс, без пробілів
+          MONITOR_IDS="801786487-801234567"   # <<< ЗАМІНИ на свої
       
+          curl -sS -X POST "https://api.uptimerobot.com/v2/editMWindow" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "api_key=${UR_API_KEY}" \
+            --data-urlencode "id=${UR_ID}" \
+            --data-urlencode "monitor_ids=${MONITOR_IDS}" \
+            -o ur_edit.json
       
-
-    
+          echo "Attach monitors response:" && cat ur_edit.json
+          if [ "$(jq -r '.stat' ur_edit.json)" != "ok" ]; then
+            echo "Failed to attach monitors to MW"; exit 1
+          fi
 
     # -------- WAIT 5 MINUTES --------
     - name: Wait until MW auto-ends
