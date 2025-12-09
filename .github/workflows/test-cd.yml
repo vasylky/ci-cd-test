@@ -44,7 +44,7 @@ jobs:
       env:
         UR_MONITOR_IDS: ${{ secrets.UPTIME_ROBOT_MONITOR_IDS }}
       run: |
-        START_TIME=$(($(date +%s) + 300))  # Start in 5 minutes
+        START_TIME=$(($(date +%s) + 30))  # Start in 5 minutes
         DURATION=5  # last 5 minutes
 
         curl -X POST "https://api.uptimerobot.com/v2/newMWindow" \
