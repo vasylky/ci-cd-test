@@ -42,27 +42,29 @@ jobs:
     # -------- UptimeRobot MW --------
     - name: Enable UptimeRobot Maintenance Window
       env:
-        UR_MONITOR_IDS: ${{ secrets.UPTIME_ROBOT_MONITOR_IDS }}
+          UR_KEY: ${{ secrets.UPTIME_ROBOT_API_KEY }}
+          UR_MONITOR_IDS: ${{ secrets.UPTIME_ROBOT_MONITOR_IDS }} # "801786487"
       run: |
-        START_TIME=$(($(date +%s) + 300))  # Start in 5 minutes
-        DURATION=5  # last 5 minutes
-
-        curl -X POST "https://api.uptimerobot.com/v2/newMWindow" \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          -d "api_key=${{ secrets.UPTIME_ROBOT_API_KEY }}" \
-          -d "friendly_name=deploy-maintenance" \
-          -d "type=1" \
-          -d "start_time=$START_TIME" \
-          -d "duration=$DURATION" \
-          -d "monitor_ids=$UR_MONITOR_IDS" \
-          -o ur.json
-
-        echo "UptimeRobot response:"
-        cat ur.json
-        UR_ID=$(jq -r '.mwindow.id' ur.json)
-        echo "UR_MW_ID=$UR_ID" >> $GITHUB_ENV
-        echo "UptimeRobot MW ID: $UR_ID"
-
+          START_TIME=$(($(date +%s) + 300))  # +5 хв
+          DURATION=5
+      
+          curl -sS -X POST "https://api.uptimerobot.com/v2/newMWindow" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "api_key=${UR_KEY}" \
+            --data-urlencode "friendly_name=deploy-maintenance" \
+            --data-urlencode "type=1" \
+            --data-urlencode "start_time=${START_TIME}" \
+            --data-urlencode "duration=${DURATION}" \
+            --data-urlencode "monitor_ids=${UR_MONITOR_IDS}" \
+            -o ur.json
+      
+          echo "UptimeRobot response:" && cat ur.json
+          # Якщо помилка — вивести причину і фейлити job
+          if jq -e '.stat=="fail"' ur.json >/dev/null 2>&1; then
+            echo "UR API error: $(jq -r '.error.message // .error.type' ur.json)"
+            exit 1
+          fi
+      
 
     # -------- WAIT 5 MINUTES --------
     - name: Wait until MW auto-ends
