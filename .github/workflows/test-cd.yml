@@ -13,66 +13,68 @@ jobs:
     # ----------------------------
     - name: Enable UptimeRobot Maintenance Window
       run: |
-        START_TIME=$(($(date +%s) + 20))   # Start in 20 seconds
-        DURATION=15                        # Minutes
-
-        curl -X POST "https://api.uptimerobot.com/v2/newMWindow" \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          -d "api_key=${{ secrets.UPTIME_ROBOT_API_KEY }}" \
-          -d "friendly_name=deploy-maintenance" \
-          -d "type=1" \
-          -d "start_time=$START_TIME" \
-          -d "duration=$DURATION" \
-          -o ur.json
-
-        echo "UptimeRobot response:"
-        cat ur.json
-
-        UR_ID=$(jq -r '.mwindow.id' ur.json)
-
-        if [ "$UR_ID" = "null" ] || [ -z "$UR_ID" ]; then
-          echo "❌ ERROR: UptimeRobot ID not found in response"
-          exit 1
-        fi
-
-        echo "UR_MW_ID=$UR_ID" >> $GITHUB_ENV
-        echo "✅ Created UptimeRobot MW ID: $UR_ID"
+          START_TIME=$(($(date +%s) + 300))   # Start in 5 minutes
+          DURATION=15
+      
+          curl -X POST "https://api.uptimerobot.com/v2/newMWindow" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "api_key=${{ secrets.UPTIME_ROBOT_API_KEY }}" \
+            -d "friendly_name=deploy-maintenance" \
+            -d "type=1" \
+            -d "start_time=$START_TIME" \
+            -d "duration=$DURATION" \
+            -o ur.json
+      
+          echo "UptimeRobot response:"
+          cat ur.json
+      
+          UR_ID=$(jq -r '.mwindow.id' ur.json)
+      
+          if [ "$UR_ID" = "null" ] || [ -z "$UR_ID" ]; then
+            echo "❌ ERROR: UptimeRobot ID not found"
+            exit 1
+          fi
+      
+          echo "UR_MW_ID=$UR_ID" >> $GITHUB_ENV
+          echo "✅ UptimeRobot MW ID: $UR_ID (starts in 5 minutes)"
+      
 
 
     - name: Enable PagerDuty Maintenance Window
       run: |
-        START=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        END=$(date -u -d "+15 minutes" +"%Y-%m-%dT%H:%M:%SZ")
-
-        curl -X POST "https://api.pagerduty.com/maintenance_windows" \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/vnd.pagerduty+json;version=2" \
-          -H "Authorization: Token token=${{ secrets.PAGERDUTY_API_KEY }}" \
-          -d "{
-            \"maintenance_window\": {
-              \"type\": \"maintenance_window\",
-              \"start_time\": \"$START\",
-              \"end_time\": \"$END\",
-              \"description\": \"Deploy Window\",
-              \"services\": [{
-                \"id\": \"${{ secrets.PAGERDUTY_SERVICE_ID }}\",
-                \"type\": \"service_reference\"
-              }]
-            }
-          }" -o pd.json
-
-        echo "PagerDuty response:"
-        cat pd.json
-
-        PD_ID=$(jq -r '.maintenance_window.id' pd.json)
-
-        if [ "$PD_ID" = "null" ] || [ -z "$PD_ID" ]; then
-          echo "❌ ERROR: PagerDuty ID not found in response"
-          exit 1
-        fi
-
-        echo "PD_MW_ID=$PD_ID" >> $GITHUB_ENV
-        echo "✅ Created PagerDuty MW ID: $PD_ID"
+            START=$(date -u -d "+5 minutes" +"%Y-%m-%dT%H:%M:%SZ")
+            END=$(date -u -d "+20 minutes" +"%Y-%m-%dT%H:%M:%SZ")  # 15 min duration
+        
+            curl -X POST "https://api.pagerduty.com/maintenance_windows" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/vnd.pagerduty+json;version=2" \
+              -H "Authorization: Token token=${{ secrets.PAGERDUTY_API_KEY }}" \
+              -d "{
+                \"maintenance_window\": {
+                  \"type\": \"maintenance_window\",
+                  \"start_time\": \"$START\",
+                  \"end_time\": \"$END\",
+                  \"description\": \"Deploy Test Window\",
+                  \"services\": [{
+                    \"id\": \"${{ secrets.PAGERDUTY_SERVICE_ID }}\",
+                    \"type\": \"service_reference\"
+                  }]
+                }
+              }" -o pd.json
+        
+            echo "PagerDuty response:"
+            cat pd.json
+        
+            PD_ID=$(jq -r '.maintenance_window.id' pd.json)
+        
+            if [ "$PD_ID" = "null" ] || [ -z "$PD_ID" ]; then
+              echo "❌ ERROR: PagerDuty ID not found"
+              exit 1
+            fi
+        
+            echo "PD_MW_ID=$PD_ID" >> $GITHUB_ENV
+            echo "✅ PagerDuty MW ID: $PD_ID (starts in 5 minutes)"
+        
 
 
     - name: Disable PagerDuty MW
