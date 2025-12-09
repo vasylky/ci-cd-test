@@ -39,13 +39,19 @@ jobs:
         echo "PagerDuty MW ID: $PD_ID"
 
 
-    # -------- UptimeRobot MW (attach monitors) --------
+   # -------- UptimeRobot MW (attach monitors) --------
     - name: Enable UptimeRobot Maintenance Window
       env:
         UR_MONITOR_IDS: ${{ secrets.UPTIME_ROBOT_MONITOR_IDS }}   # e.g. "801786487" or "801786487-801234567"
+        UR_KEY: ${{ secrets.UPTIME_ROBOT_API_KEY }}              # Ensure you have your Main API Key here
       run: |
-        START_TIME=$(($(date +%s) + 30))  # Start in 5 minutes
-        DURATION=5                          # last 5 minutes
+        # Calculate start time (now + 30 seconds) and duration (5 minutes)
+        START_TIME=$(($(date +%s) + 30))
+        DURATION=300 # Duration should be in seconds for this endpoint (5 minutes = 300s)
+
+        echo "Attempting to create a one-time MW for monitors: ${UR_MONITOR_IDS}"
+        echo "Start Time (Epoch): ${START_TIME}, Duration (Seconds): ${DURATION}"
+
         curl -sS -X POST "https://api.uptimerobot.com/v2/newMWindow" \
            -H "Content-Type: application/x-www-form-urlencoded" \
            --data-urlencode "api_key=${UR_KEY}" \
@@ -53,26 +59,23 @@ jobs:
            --data-urlencode "type=1" \
            --data-urlencode "start_time=${START_TIME}" \
            --data-urlencode "duration=${DURATION}" \
-           --data-urlencode "monitor_ids=${UR_MONITOR_IDS}" \
-           -o ur.json
+           --data-urlencode "monitors=${UR_MONITOR_IDS}" \
+           -o ur_create_response.json
 
-        echo "UR create MW response:" && cat ur.json
-        UR_ID=$(jq -r '.mwindow.id' ur.json)
+        echo "UR create MW response:" && cat ur_create_response.json
+
+        # Check if creation was successful and extract the ID using 'jq'
+        if [ $(jq -r '.stat' ur_create_response.json) != "ok" ]; then
+            echo "Failed to create UptimeRobot Maintenance Window."
+            exit 1
+        fi
+
+        UR_ID=$(jq -r '.mwindow.id' ur_create_response.json)
         echo "UR_MW_ID=${UR_ID}" >> $GITHUB_ENV
-        echo "UptimeRobot MW ID: ${UR_ID}"
+        echo "UptimeRobot MW ID: ${UR_ID} created successfully."
 
-
-        IFS='-' read -ra IDS <<< "${UR_MONITOR_IDS}"
-        for MID in "${IDS[@]}"; do
-        echo "Attach MW ${UR_ID} to monitor ${MID}"
-        curl -sS -X POST "https://api.uptimerobot.com/v2/editMonitor" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            --data-urlencode "api_key=${UR_KEY}" \
-            --data-urlencode "id=${MID}" \
-            --data-urlencode "mwindows=${UR_ID}" \
-            -o "edit_${MID}.json"
-        echo "editMonitor(${MID}):" && cat "edit_${MID}.json"
-        done
+        # The subsequent loop using editMonitor is unnecessary with the fixed 'monitors' parameter above.
+        # Monitors are now already attached to the MW upon creation.
 
     # -------- WAIT 5 MINUTES --------
     - name: Wait until MW auto-ends
