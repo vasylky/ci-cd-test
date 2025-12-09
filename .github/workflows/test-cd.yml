@@ -9,19 +9,22 @@ jobs:
 
     steps:
 
-    - name: Enable UptimeRobot MW (hardcoded)
+    - name: Create UptimeRobot MW (JSON)
+      env:
+          UR_API_KEY: ${{ secrets.UPTIME_ROBOT_API_KEY }}
       run: |
-          START_TIME=$(( $(date +%s) + 45 ))  # +5 хв
+          START_TIME=$(( $(date +%s) + 300 ))  # +5 хв
           curl -sS -X POST "https://api.uptimerobot.com/v2/newMWindow" \
-          -H "Content-Type: application/json" \
-          -d '{
-            "api_key": "'"${UPTIME_ROBOT_API_KEY}"'",
-            "friendlyName": "deploy-maintenance",
-            "type": 1,
-            "startTime": '"$START_TIME"',
-            "duration": 5,
-            "monitorIds": [801786487,801234567]
-          }'
+            -H "Content-Type: application/json" \
+            -d '{
+              "api_key": "'"${UR_API_KEY}"'",
+              "friendlyName": "deploy-maintenance",
+              "type": 1,
+              "startTime": '"$START_TIME"',
+              "duration": 5,
+              "monitorIds": [801786487,801234567]
+            }'
+      
 
     
 
