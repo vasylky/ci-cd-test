@@ -41,9 +41,6 @@ jobs:
 
     # -------- UptimeRobot MW --------
     - name: Enable UptimeRobot Maintenance Window
-      env:
-          UR_KEY: ${{ secrets.UPTIME_ROBOT_API_KEY }}
-          UR_MONITOR_IDS: ${{ secrets.UPTIME_ROBOT_MONITOR_IDS }} # "801786487"
       run: |
           START_TIME=$(($(date +%s) + 300))  # +5 хв
           DURATION=5
@@ -55,7 +52,7 @@ jobs:
             --data-urlencode "type=1" \
             --data-urlencode "start_time=${START_TIME}" \
             --data-urlencode "duration=${DURATION}" \
-            --data-urlencode "monitor_ids=${UR_MONITOR_IDS}" \
+            --data-urlencode "monitors=801786487" \
             -o ur.json
       
           echo "UptimeRobot response:" && cat ur.json
