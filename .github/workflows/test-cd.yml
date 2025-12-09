@@ -18,9 +18,9 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "api_key": "'"${UR_API_KEY}"'",
-              "friendlyName": "deploy-maintenance",
+              "friendly_name": "deploy-maintenance",
               "type": 1,
-              "startTime": '"$START_TIME"',
+              "start_time": '"$START_TIME"',
               "duration": 5,
               "monitorIds": [801786487,801234567]
             }'
